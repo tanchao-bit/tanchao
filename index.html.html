@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>灌砂法压实度-可安装存档版</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <style>
+        * {margin: 0; padding: 0; box-sizing: border-box; font-family: "微软雅黑", sans-serif;}
+        body {background: #f5f7fa; padding: 8px;}
+        .container {max-width: 720px; margin: 0 auto; background: #fff; border-radius: 6px; padding: 8px;}
+        h2 {text-align: center; color: #0066cc; margin-bottom: 10px; font-size: 18px;}
+        table {width: 100%; border-collapse: collapse; border: 1px solid #333; font-size: 13px;}
+        th, td {border: 1px solid #333; padding: 5px 3px; text-align: center;}
+        .left-col {width: 14%; background: #eef5ff; font-weight: bold;}
+        input, select {width: 92%; padding: 3px; border: 1px solid #ccc; border-radius: 3px; font-size: 13px;}
+        .btn-row {display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;justify-content:center;}
+        button {padding:5px 12px;border:none;border-radius:4px;font-size:13px;cursor:pointer;}
+        .btn-cal{background:#0066cc;color:#fff;}
+        .btn-save{background:#28a745;color:#fff;}
+        .btn-export{background:#ff9900;color:#fff;}
+        .btn-clear{background:#dc3545;color:#fff;}
+        .btn-reset{background:#999;color:#fff;}
+        .result-box {padding:8px;background:#f0f8ff;border-radius:4px;margin-bottom:10px;font-size:13px;}
+        .record-box {max-height:220px;overflow:auto;border:1px solid #ccc;padding:6px;border-radius:4px;}
+        .record-item {font-size:12px;padding:4px;border-bottom:1px solid #eee;}
+        .judge-pass {color:green;font-weight:bold;}
+        .judge-fail {color:red;font-weight:bold;}
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>灌砂法压实度现场速算【存档版】</h2>
+    <table>
+        <tr>
+            <td rowspan="3" class="left-col">基础信息</td>
+            <td>量砂密度(g/cm³)</td>
+            <td><input type="number" id="sandDensity" value="1.42" step="0.01"></td>
+        </tr>
+        <tr>
+            <td>最大干密度(g/cm³)</td>
+            <td><input type="number" id="maxDryDensity" step="0.01"></td>
+        </tr>
+        <tr>
+            <td>灌砂前筒+砂质量(g)</td>
+            <td><input type="number" id="m1"></td>
+        </tr>
+        <tr>
+            <td rowspan="2" class="left-col">标定</td>
+            <td>试验模式</td>
+            <td>
+                <select id="sandMode" onchange="changeMode()">
+                    <option value="base">带基板模式</option>
+                    <option value="normal">无基板模式</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td id="dynLabel">带基板标定后筒+砂质量(g)</td>
+            <td><input type="number" id="mSpecial"></td>
+        </tr>
+        <tr>
+            <td rowspan="3" class="left-col">试验</td>
+            <td>灌砂后筒+砂质量(g)</td>
+            <td><input type="number" id="m2"></td>
+        </tr>
+        <tr>
+            <td>湿土总质量(g)</td>
+            <td><input type="number" id="wetSoil"></td>
+        </tr>
+        <tr>
+            <td>现场含水率(%)</td>
+            <td><input type="number" id="waterRate" step="0.01"></td>
+        </tr>
+        <tr>
+            <td rowspan="3" class="left-col">判定</td>
+            <td>公路等级</td>
+            <td>
+                <select id="roadLevel">
+                    <option value="1">高速/一级</option>
+                    <option value="2">二级公路</option>
+                    <option value="3">三四级公路</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>结构部位</td>
+            <td>
+                <select id="structLevel">
+                    <option value="subgrade_upper">路基-上路床</option>
+                    <option value="subgrade_lower">路基-下路床</option>
+                    <option value="embankment_upper">路基-上路堤</option>
+                    <option value="embankment_lower">路基-下路堤</option>
+                    <option value="subbase">底基层</option>
+                    <option value="base">基层</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>桩号/点位</td>
+            <td><input type="text" id="pointName" placeholder="填写点位"></td>
+        </tr>
+    </table>
+    <div class="btn-row">
+        <button class="btn-cal" onclick="calc()">计算</button>
+        <button class="btn-save" onclick="saveData()">保存本条数据</button>
+        <button class="btn-export" onclick="exportExcel()">导出Excel</button>
+        <button class="btn-reset" onclick="resetAll()">清空输入</button>
+        <button class="btn-clear" onclick="clearAllRecord()">清空存档</button>
+    </div>
+    <div class="result-box" id="result">
+        <div>试坑体积：-- cm³｜湿密度：-- g/cm³</div>
+        <div>干密度：-- g/cm³｜压实度：-- %</div>
+        <div>判定标准：-- ｜结果：--</div>
+    </div>
+    <div style="font-size:13px;margin:6px 0;"><b>📋 多点存档记录：</b></div>
+    <div class="record-box" id="recordBox">暂无存档数据</div>
+</div>
+
+<script>
+function standardRound(num,digit){
+    if(isNaN(num))return 0;
+    let p=Math.pow(10,digit);
+    return Math.round(num*p)/p;
+}
+
+function changeMode(){
+    let m=document.getElementById("sandMode").value;
+    if(m==="base"){
+        document.getElementById("dynLabel").innerText = "带基板标定后筒+砂质量(g)";
+    }else{
+        document.getElementById("dynLabel").innerText = "锥砂质量(g)";
+    }
+}
+
+function getStandard(road,struct){
+    let map={
+        "1":{
+            subgrade_upper:96,subgrade_lower:96,
+            embankment_upper:94,embankment_lower:93,
+            subbase:96,base:98
+        },
+        "2":{
+            subgrade_upper:95,subgrade_lower:95,
+            embankment_upper:93,embankment_lower:92,
+            subbase:95,base:97
+        },
+        "3":{
+            subgrade_upper:94,subgrade_lower:93,
+            embankment_upper:92,embankment_lower:91,
+            subbase:93,base:95
+        }
+    };
+    return map[road][struct];
+}
+
+let recordList=JSON.parse(localStorage.getItem("yasuoRecord"))||[];
+let nowData={};
+
+function calc(){
+    let m1=+document.getElementById("m1").value||0;
+    let m2=+document.getElementById("m2").value||0;
+    let mSpecial=+document.getElementById("mSpecial").value||0;
+    let sandDensity=+document.getElementById("sandDensity").value||1.42;
+    let wetSoil=+document.getElementById("wetSoil").value||0;
+    let waterRate=+document.getElementById("waterRate").value||0;
+    let maxDry=+document.getElementById("maxDryDensity").value||0;
+    let mode=document.getElementById("sandMode").value;
+    let roadLv=document.getElementById("roadLevel").value;
+    let structLv=document.getElementById("structLevel").value;
+    let point=document.getElementById("pointName").value;
+
+    let useSand;
+    if(mode==="base"){
+        let cone=m1-mSpecial;
+        useSand=m1-m2-cone;
+    }else{
+        useSand=m1-m2-mSpecial;
+    }
+
+    let volume=useSand/sandDensity;
+    let wetDensity=volume>0?wetSoil/volume:0;
+    let dryDensity=wetDensity/(1+waterRate/100);
+    let compact=maxDry>0?(dryDensity/maxDry)*100:0;
+
+    let vol=standardRound(volume,2);
+    let wd=standardRound(wetDensity,2);
+    let dd=standardRound(dryDensity,2);
+    let k=standardRound(compact,1);
+    let std=getStandard(roadLv,structLv);
+    let resTxt=k>=std?"合格":"不合格";
+    let resClass=k>=std?"judge-pass":"judge-fail";
+
+    nowData={
+        time:new Date().toLocaleString(),
+        point:point,
+        road:roadLv,
+        struct:structLv,
+        sandDensity: sandDensity,
+        maxDry: maxDry,
+        m1: m1,
+        mSpecial: mSpecial,
+        m2: m2,
+        wetSoil: wetSoil,
+        waterRate: waterRate,
+        mode: mode,
+        volume:vol,
+        wetDensity:wd,
+        dryDensity:dd,
+        compact:k,
+        std:std,
+        result:resTxt
+    };
+
+    document.getElementById("result").innerHTML=`
+        <div>试坑体积：${vol} cm³｜湿密度：${wd} g/cm³</div>
+        <div>干密度：${dd} g/cm³｜压实度：${k} %</div>
+        <div>判定标准：≥${std}% ｜结果：<span class="${resClass}">${resTxt}</span></div>
+    `;
+}
+
+function saveData(){
+    if(!nowData.compact){alert("请先点击【计算】再保存！");return;}
+    recordList.push({...nowData});
+    localStorage.setItem("yasuoRecord",JSON.stringify(recordList));
+    alert("本条数据保存成功！");
+    renderRecord();
+}
+
+function renderRecord(){
+    let box=document.getElementById("recordBox");
+    if(recordList.length===0){
+        box.innerHTML="暂无存档数据";
+        return;
+    }
+    let html="";
+    recordList.forEach((item,idx)=>{
+        html+=`<div class="record-item">
+        ${idx+1}.${item.point}｜压实度:${item.compact}%｜${item.result}｜${item.time}
+        </div>`;
+    });
+    box.innerHTML=html;
+}
+
+function exportExcel(){
+    if(recordList.length===0){alert("无存档可导出！");return;}
+    let title=[
+        "序号","时间","桩号点位","试验模式",
+        "量砂密度","最大干密度","灌砂前筒+砂质量","标定/锥砂质量","灌砂后筒+砂质量",
+        "湿土质量","含水率","试坑体积","湿密度","干密度","压实度","合格标准","结果"
+    ];
+    let csv=title.join(",")+"\n";
+    recordList.forEach((d,i)=>{
+        let row=[
+            i+1,
+            d.time,
+            d.point,
+            d.mode==="base"?"带基板":"无基板",
+            d.sandDensity,
+            d.maxDry,
+            d.m1,
+            d.mSpecial,
+            d.m2,
+            d.wetSoil,
+            d.waterRate,
+            d.volume,
+            d.wetDensity,
+            d.dryDensity,
+            d.compact+"%",
+            "≥"+d.std+"%",
+            d.result
+        ];
+        csv+=row.join(",")+"\n";
+    });
+    let blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
+    let url=URL.createObjectURL(blob);
+    let a=document.createElement("a");
+    a.href=url;
+    a.download="压实度全数据.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function resetAll(){
+    document.querySelectorAll("input").forEach(i=>i.value="");
+    document.getElementById("sandDensity").value="1.42";
+    document.getElementById("sandMode").value="base";
+    changeMode();
+    document.getElementById("result").innerHTML=`
+        <div>试坑体积：-- cm³｜湿密度：-- g/cm³</div>
+        <div>干密度：-- g/cm³｜压实度：-- %</div>
+        <div>判定标准：-- ｜结果：--</div>
+    `;
+    nowData={};
+}
+
+function clearAllRecord(){
+    if(!confirm("确定清空全部存档记录？不可恢复！"))return;
+    recordList=[];
+    localStorage.removeItem("yasuoRecord");
+    renderRecord();
+}
+
+window.onload=function(){
+    changeMode();
+    renderRecord();
+};
+</script>
+</body>
+</html>
